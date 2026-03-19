@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['bullmq', 'ioredis'],
+    serverComponentsExternalPackages: ['bullmq', 'ioredis', 'twilio', 'googleapis'],
   },
 }
 

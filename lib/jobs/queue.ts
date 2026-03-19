@@ -1,10 +1,38 @@
 import { Queue, type ConnectionOptions } from 'bullmq'
-import { redis } from '@/lib/redis'
+import { getRedis } from '@/lib/redis'
 
-const connection = redis as unknown as ConnectionOptions
+function getConnection(): ConnectionOptions {
+  return getRedis() as unknown as ConnectionOptions
+}
 
-export const reminderQueue = new Queue('reminders', { connection })
-export const followUpQueue = new Queue('followups', { connection })
+let _reminderQueue: Queue | null = null
+let _followUpQueue: Queue | null = null
+
+function getReminderQueue(): Queue {
+  if (!_reminderQueue) {
+    _reminderQueue = new Queue('reminders', { connection: getConnection() })
+  }
+  return _reminderQueue
+}
+
+function getFollowUpQueue(): Queue {
+  if (!_followUpQueue) {
+    _followUpQueue = new Queue('followups', { connection: getConnection() })
+  }
+  return _followUpQueue
+}
+
+export const reminderQueue = new Proxy({} as Queue, {
+  get(_target, prop) {
+    return (getReminderQueue() as unknown as Record<string | symbol, unknown>)[prop]
+  },
+})
+
+export const followUpQueue = new Proxy({} as Queue, {
+  get(_target, prop) {
+    return (getFollowUpQueue() as unknown as Record<string | symbol, unknown>)[prop]
+  },
+})
 
 export async function scheduleJobsForMeeting(meeting: {
   id: string
