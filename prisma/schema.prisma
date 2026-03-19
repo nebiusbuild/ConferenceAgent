@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoomType {
+  EXECUTIVE
+  SALES
+  BOOTH
+}
+
+enum SessionType {
+  TALK
+  PANEL
+  WORKSHOP
+  KEYNOTE
+  FIRESIDE_CHAT
+}
+
+enum EventType {
+  HAPPY_HOUR
+  DINNER
+  BREAKFAST
+  NETWORKING
+  RECEPTION
+  AFTER_PARTY
+}
+
+enum MeetingStatus {
+  CONFIRMED
+  RESCHEDULING
+  PENDING
+  CANCELLED
+  COMPLETED
+}
+
+enum LogType {
+  EMAIL
+  SMS
+  HUBSPOT_SYNC
+  RESCHEDULE
+  FOLLOWUP
+  REMINDER
+}
+
+enum LogStatus {
+  SENT
+  DELIVERED
+  FAILED
+  AWAITING_REPLY
+}
+
+model Room {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  capacity  Int
+  type      RoomType
+  floor     String
+  color     String
+  meetings  Meeting[]
+  sessions  Session[]
+  events    Event[]
+  createdAt DateTime  @default(now())
+}
+
+model Meeting {
+  id               String        @id @default(cuid())
+  title            String
+  room             Room          @relation(fields: [roomId], references: [id])
+  roomId           String
+  contact          Contact       @relation(fields: [contactId], references: [id])
+  contactId        String
+  salesRep         SalesRep      @relation(fields: [salesRepId], references: [id])
+  salesRepId       String
+  startTime        DateTime
+  endTime          DateTime
+  status           MeetingStatus @default(PENDING)
+  attendeeCount    Int           @default(1)
+  hubspotDealId    String?
+  hubspotContactId String?
+  gmailThreadId    String?
+  notes            String?
+  agentLogs        AgentLog[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([roomId, startTime, endTime])
+  @@index([status])
+  @@index([contactId])
+}
+
+model Contact {
+  id                  String               @id @default(cuid())
+  name                String
+  email               String               @unique
+  phone               String?
+  company             String
+  hubspotId           String?
+  meetings            Meeting[]
+  sessionRegistrations SessionRegistration[]
+  eventRegistrations  EventRegistration[]
+  createdAt           DateTime             @default(now())
+}
+
+model SalesRep {
+  id       String    @id @default(cuid())
+  name     String
+  email    String    @unique
+  clerkId  String?
+  meetings Meeting[]
+}
+
+model AgentLog {
+  id         String    @id @default(cuid())
+  meeting    Meeting?  @relation(fields: [meetingId], references: [id])
+  meetingId  String?
+  type       LogType
+  channel    String
+  message    String
+  status     LogStatus
+  rawPayload Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([meetingId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Session {
+  id            String              @id @default(cuid())
+  title         String
+  description   String?
+  type          SessionType
+  room          Room?               @relation(fields: [roomId], references: [id])
+  roomId        String?
+  startTime     DateTime
+  endTime       DateTime
+  speakers      String[]
+  capacity      Int?
+  trackName     String?
+  registrations SessionRegistration[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([startTime])
+  @@index([type])
+}
+
+model SessionRegistration {
+  id        String   @id @default(cuid())
+  session   Session  @relation(fields: [sessionId], references: [id])
+  sessionId String
+  contact   Contact  @relation(fields: [contactId], references: [id])
+  contactId String
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, contactId])
+}
+
+model Event {
+  id            String             @id @default(cuid())
+  title         String
+  description   String?
+  type          EventType
+  room          Room?              @relation(fields: [roomId], references: [id])
+  roomId        String?
+  location      String?
+  startTime     DateTime
+  endTime       DateTime
+  capacity      Int?
+  dressCode     String?
+  registrations EventRegistration[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([startTime])
+  @@index([type])
+}
+
+model EventRegistration {
+  id        String   @id @default(cuid())
+  event     Event    @relation(fields: [eventId], references: [id])
+  eventId   String
+  contact   Contact  @relation(fields: [contactId], references: [id])
+  contactId String
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, contactId])
+}
