@@ -46,8 +46,8 @@ const updateMeetingSchema = z.object({
   status: z.enum(['CONFIRMED', 'RESCHEDULING', 'PENDING', 'CANCELLED', 'COMPLETED']).optional(),
   startTime: z.string().datetime().optional(),
   endTime: z.string().datetime().optional(),
-  roomId: z.string().uuid().optional(),
-  salesRepId: z.string().uuid().optional(),
+  roomId: z.string().optional(),
+  salesRepId: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -91,8 +91,8 @@ export async function PATCH(
         );
       }
 
-      const isAvailable = await checkRoomAvailability(newRoomId, newStart, newEnd, id);
-      if (!isAvailable) {
+      const { available } = await checkRoomAvailability(newRoomId, newStart, newEnd, id);
+      if (!available) {
         return NextResponse.json(
           { error: 'Room is not available for the requested time slot' },
           { status: 409 }

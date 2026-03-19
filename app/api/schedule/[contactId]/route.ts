@@ -128,7 +128,7 @@ export async function GET(
 const updateRegistrationSchema = z.object({
   action: z.enum(['add', 'remove']),
   type: z.enum(['session', 'event']),
-  itemId: z.string().uuid(),
+  itemId: z.string(),
 });
 
 export async function PATCH(

@@ -6,7 +6,7 @@ import { syncMeetingToHubSpot } from '@/lib/hubspot';
 
 const triggerSchema = z.object({
   type: z.enum(['REMINDER', 'FOLLOWUP', 'HUBSPOT_SYNC']),
-  meetingId: z.string().uuid().optional(),
+  meetingId: z.string().optional(),
   scope: z.enum(['next_hour', 'all']).optional(),
 });
 
