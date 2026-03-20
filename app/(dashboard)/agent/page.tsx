@@ -71,6 +71,7 @@ export default function AgentPage() {
   const [error, setError] = useState<string | null>(null);
   const [triggeringAction, setTriggeringAction] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<{ id: string; message: string; success: boolean } | null>(null);
+  const [stoppingAction, setStoppingAction] = useState<string | null>(null);
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -134,10 +135,11 @@ export default function AgentPage() {
         body: JSON.stringify({ type: action.type, scope: action.scope }),
       });
       const data = await res.json();
+      const stoppedMsg = data.stopped ? ' (stopped by user)' : '';
       setActionResult({
         id: action.id,
         message: res.ok
-          ? `${action.label}: ${data.processed ?? 0} item(s) processed`
+          ? `${action.label}: ${data.processed ?? 0} item(s) processed${stoppedMsg}`
           : data.error || 'Action failed',
         success: res.ok,
       });
@@ -147,6 +149,46 @@ export default function AgentPage() {
     } finally {
       setTriggeringAction(null);
       setTimeout(() => setActionResult(null), 6000);
+    }
+  };
+
+  const handleStop = async (action: typeof triggerActions[0]) => {
+    try {
+      setStoppingAction(action.id);
+      const res = await fetch('/api/agent/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: action.type }),
+      });
+      const data = await res.json();
+      if (res.ok && data.stopped) {
+        setActionResult({
+          id: action.id,
+          message: `${action.label} stopped`,
+          success: true,
+        });
+      }
+    } catch {
+      // Silently fail — the operation may have already finished
+    } finally {
+      setStoppingAction(null);
+    }
+  };
+
+  const handleStopAll = async () => {
+    try {
+      await fetch('/api/agent/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      setActionResult({
+        id: 'all',
+        message: 'All operations stopped',
+        success: true,
+      });
+    } catch {
+      // Silently fail
     }
   };
 
@@ -192,16 +234,31 @@ export default function AgentPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1
-          className="text-2xl font-light tracking-wide"
-          style={{ fontFamily: "'Cormorant Garamond', serif", color: 'var(--text-primary)' }}
-        >
-          Agent Activity
-        </h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-          Jordan&apos;s automated scheduling actions and communications
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1
+            className="text-2xl font-light tracking-wide"
+            style={{ fontFamily: "'Cormorant Garamond', serif", color: 'var(--text-primary)' }}
+          >
+            Agent Activity
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+            Jordan&apos;s automated scheduling actions and communications
+          </p>
+        </div>
+        {triggeringAction && (
+          <button
+            onClick={handleStopAll}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:brightness-110"
+            style={{
+              backgroundColor: 'rgba(200, 50, 50, 0.15)',
+              color: '#e05555',
+              border: '1px solid rgba(200, 50, 50, 0.3)',
+            }}
+          >
+            Stop All
+          </button>
+        )}
       </div>
 
       {actionResult && (
@@ -219,22 +276,48 @@ export default function AgentPage() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {triggerActions.map((action) => (
-          <button
-            key={action.id}
-            onClick={() => handleTrigger(action)}
-            disabled={triggeringAction !== null}
-            className="p-4 rounded-xl border text-left transition-all duration-200 hover:brightness-110 disabled:opacity-50"
-            style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
-          >
-            <span className="text-sm font-medium" style={{ color: action.color }}>
-              {triggeringAction === action.id ? 'Processing...' : action.label}
-            </span>
-            <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              {action.description}
-            </p>
-          </button>
-        ))}
+        {triggerActions.map((action) => {
+          const isRunning = triggeringAction === action.id;
+          const isStopping = stoppingAction === action.id;
+
+          return (
+            <div
+              key={action.id}
+              className="p-4 rounded-xl border transition-all duration-200"
+              style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <button
+                  onClick={() => handleTrigger(action)}
+                  disabled={triggeringAction !== null}
+                  className="text-left flex-1 disabled:opacity-50"
+                >
+                  <span className="text-sm font-medium" style={{ color: action.color }}>
+                    {isRunning ? 'Processing...' : action.label}
+                  </span>
+                  <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    {action.description}
+                  </p>
+                </button>
+                {isRunning && (
+                  <button
+                    onClick={() => handleStop(action)}
+                    disabled={isStopping}
+                    className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 hover:brightness-125 disabled:opacity-50"
+                    style={{
+                      backgroundColor: 'rgba(200, 50, 50, 0.15)',
+                      color: '#e05555',
+                      border: '1px solid rgba(200, 50, 50, 0.3)',
+                    }}
+                    title="Stop this operation"
+                  >
+                    {isStopping ? 'Stopping...' : 'Stop'}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <AgentLog logs={logs} onTriggerAction={handleAgentTrigger} />
